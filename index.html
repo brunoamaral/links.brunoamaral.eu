@@ -84,7 +84,6 @@
           .graphData(data)
           .nodeId("id")
           .nodeVal(node => node.val || 5)
-          .nodeAutoColorBy("group")
           .linkSource("source")
           .linkTarget("target")
           .onZoom(({k}) => { currentZoomLevel = k; })
@@ -92,7 +91,13 @@
             const size = 5;
             ctx.beginPath();
             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-            ctx.fillStyle = node.color;
+            // Set color based on group
+            if (node.group === 1) {
+              ctx.fillStyle = 'green'; // Green color for group 1 (Tags)
+            } else {
+              ctx.fillStyle = 'blue'; // Default color for other groups (Urls)
+            }
+
             ctx.fill();
 
             if (node.type === "tag" || (node.type === "url" && currentZoomLevel > 2)) { // Adjust zoom level threshold as needed
