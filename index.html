@@ -12,27 +12,32 @@
     <div id="graph"></div>
   
     <script>
+      // Extract tag from URL hash
+      const urlHash = window.location.hash;
+      const filterTag = urlHash ? urlHash.substring(1) : null;
+
       function transformSourceToTarget(sourceData) {
         const targetData = { nodes: [], links: [] };
         const tagToNodeId = new Map();
         let nextNodeId = 0;
         const excludedTags = new Set(["p-skip", "p-bsky", "personal", "p-mast"]);
         const tagCount = new Map();
-    
+        const connectedToFilterTag = new Set();
+
         // First pass: Count the occurrences of each tag
         sourceData.forEach(item => {
           item.tags.forEach(tag => {
             tagCount.set(tag.name, (tagCount.get(tag.name) || 0) + 1);
           });
         });
-    
+
         // Exclude tags with less than 2 occurrences
         tagCount.forEach((count, tag) => {
           if (count < 2) {
             excludedTags.add(tag);
           }
         });
-    
+
         // Second pass: Build the graph data
         sourceData.forEach((item) => {
           const hasPersonalTag = item.tags && item.tags.some(tag => tag.name === 'personal');
@@ -44,7 +49,7 @@
               label: item.title,
               url: item.url,
             });
-    
+
             item.tags.forEach((tag) => {
               if (!excludedTags.has(tag.name)) {
                 let tagNodeId;
@@ -69,10 +74,29 @@
             });
           }
         });
-    
+
+        // Mark nodes connected to the filter tag
+        if (filterTag) {
+          sourceData.forEach(item => {
+            item.tags.forEach(tag => {
+              if (tag.name === filterTag) {
+                connectedToFilterTag.add(`url-${item.id}`);
+                if (tagToNodeId.has(tag.id)) {
+                  connectedToFilterTag.add(tagToNodeId.get(tag.id));
+                }
+              }
+            });
+          });
+        }
+
+        // Add a property to each node to indicate if it's connected to the filter tag
+        targetData.nodes.forEach(node => {
+          node.connectedToFilterTag = connectedToFilterTag.has(node.id);
+        });
+
         return targetData;
       }
-  
+
       fetch("shioridb.json")
       .then(response => response.json())
       .then(sourceData => {
@@ -91,16 +115,16 @@
             const size = 5;
             ctx.beginPath();
             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-            // Set color based on group
-            if (node.group === 1) {
-              ctx.fillStyle = 'green'; // Green color for group 1 (Tags)
-            } else {
-              ctx.fillStyle = 'blue'; // Default color for other groups (Urls)
-            }
+
+            // Adjust color and opacity based on connection to the filter tag
+            const isConnectedToFilterTag = filterTag ? node.connectedToFilterTag : true;
+            ctx.globalAlpha = isConnectedToFilterTag ? 1.0 : 0.1;
+            ctx.fillStyle = node.group === 1 ? 'green' : 'blue';
 
             ctx.fill();
+            ctx.globalAlpha = 1.0; // Reset globalAlpha for text
 
-            if (node.type === "tag" || (node.type === "url" && currentZoomLevel > 2)) { // Adjust zoom level threshold as needed
+            if (node.type === "tag" || (node.type === "url" && currentZoomLevel > 2)) {
               const label = node.label;
               const fontSize = 12 / globalScale;
               ctx.font = `${fontSize}px Sans-Serif`;
@@ -119,6 +143,6 @@
           });
       })
       .catch(error => console.error("Error loading the data:", error));
-  </script>
-</body>
+    </script>
+  </body>
 </html>
